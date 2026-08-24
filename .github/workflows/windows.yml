@@ -1,0 +1,48 @@
+name: Windows build
+
+# Runs on every push to main, and on demand from the Actions tab.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # GitHub's Windows image ships Visual Studio 2022 with the
+    # "Desktop development with C++" workload, which is what Flutter's
+    # Windows toolchain needs. Nothing else to install.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true # caches the SDK between runs; first run is the slow one
+
+      - name: Show toolchain
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Cheap, and it catches the image-resolution and view-model regressions
+      # the test suite covers. Drop this step if you'd rather builds never
+      # block on tests.
+      - name: Run tests
+        run: flutter test
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      # The whole folder is the deliverable: the .exe alone will not launch
+      # without flutter_windows.dll, the plugin DLLs, and data\.
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: rosemont-events-windows-x64
+          path: build/windows/x64/runner/Release/
+          if-no-files-found: error
